@@ -4,7 +4,7 @@ no strict 'refs';  # Let's just make this very clear right off
 
 use Carp;
 use vars qw($VERSION);
-$VERSION = do { my @r = (q$Revision: 1.14 $ =~ /\d+/g); sprintf '%d.%03d'.'%02d' x ($#r-1), @r};
+$VERSION = do { my @r = (q$Revision: 1.15 $ =~ /\d+/g); sprintf '%d.%03d'.'%02d' x ($#r-1), @r};
 
 my $Ident = '[^\W_0-9]\w*';
 
@@ -47,22 +47,24 @@ sub import {
         }
 
         ## Index change
-        elsif (/^($Ident)=(.+)$/o) {
+        elsif (/^($Ident)=(-?)(.+)$/o) {
             my $name= $1;
-            $index  = $2;
+            my $neg = $2;
+            $index  = $3;
 
             ## Convert non-decimal numerics to decimal
-            if ($index =~ /^0x[\da-f]/i) {       ## Hex
+            if ($index =~ /^0x[\da-f]+$/i) {    ## Hex
                 $index = hex $index;
             }
-            elsif ($index =~ /^0\d/) {      ## Oct
+            elsif ($index =~ /^0\d/) {          ## Octal
                 $index = oct $index;
             }
-            elsif ($index !~ /[^\d_]/) {    ## 123_456 notation
-                $index =~ s/_//;
+            elsif ($index !~ /[^\d_]/) {        ## 123_456 notation
+                $index =~ s/_//g;
             }
 
-            my $n = $index;
+            $index  = "$neg$index";
+            my $n   = $index;
 
             if ($mode == BITMASK) {
                 ($index & ($index - 1))
@@ -80,7 +82,7 @@ sub import {
         }
 
         ## Prefix/option change
-        elsif (/^([A-Z]*):($Ident)?(=?)(.*)/) {
+        elsif (/^([A-Z]*):($Ident)?(=?)(-?)(.*)/) {
             ## Option change
             if ($1) {
                 if      ($1 eq 'ENUM')      { $mode = ENUM;     $index = 0 }
@@ -88,21 +90,25 @@ sub import {
                 else    { croak qq(Invalid enum option '$1') }
             }
 
+            my $neg = $4;
+
             ## Index change too?
             if ($3) {
-                if (length $4) {
-                    $index = $4;
+                if (length $5) {
+                    $index = $5;
 
                     ## Convert non-decimal numerics to decimal
-                    if ($index =~ /^0x[\da-f]/i) {       ## Hex
+                    if ($index =~ /^0x[\da-f]+$/i) {    ## Hex
                         $index = hex $index;
                     }
-                    elsif ($index =~ /^0\d/) {      ## Oct
+                    elsif ($index =~ /^0\d/) {          ## Oct
                         $index = oct $index;
                     }
-                    elsif ($index !~ /[^\d_]/) {    ## 123_456 notation
-                        $index =~ s/_//;
+                    elsif ($index !~ /[^\d_]/) {        ## 123_456 notation
+                        $index =~ s/_//g;
                     }
+
+                    $index = "$neg$index";
 
                     ## Bitmask mode must check index changes
                     if ($mode == BITMASK) {
