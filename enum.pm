@@ -4,7 +4,7 @@ no strict 'refs';  # Let's just make this very clear right off
 
 use Carp;
 use vars qw($VERSION);
-$VERSION = do { my @r = (q$Revision: 1.9 $ =~ /\d+/g); sprintf '%d.%03d'.'%02d' x ($#r-1), @r};
+$VERSION = do { my @r = (q$Revision: 1.10 $ =~ /\d+/g); sprintf '%d.%03d'.'%02d' x ($#r-1), @r};
 
 my $Ident = '[^\W_0-9]\w*';
 
@@ -20,18 +20,10 @@ sub import {
 	foreach (@_) {
 		if (/^$Ident$/o) {							## Plain tag is most common case
 			my $n = $index++;
-			die "pkg" unless defined $pkg;
-			die "prefix" unless defined $prefix;
-			die "_" unless defined $_;
-			die "n" unless defined $n;
 			*{"$pkg$prefix$_"} = sub () { $n };
 		} elsif (/^($Ident)=(.+)$/o) {				## Index change
 			$index	= $2;
 			my $n	= $index++;
-			die "pkg" unless defined $pkg;
-			die "prefix" unless defined $prefix;
-			die "_" unless defined $_;
-			die "n" unless defined $n;
 			*{"$pkg$prefix$1"} = sub () { $n };
 		} elsif (/^:($Ident)?(=?)(.*)/) {			## Prefix change
 			if ($2) {								## Index change too?
@@ -45,10 +37,6 @@ sub import {
 		} elsif (/^($Ident)\.\.($Ident)$/o) {		## A..Z case magic lists
 			foreach my $name ("$1" .. "$2") {		## Almost never used, so check last
 				my $n = $index++;
-				die "pkg" unless defined $pkg;
-				die "prefix" unless defined $prefix;
-				die "_" unless defined $_;
-				die "n" unless defined $n;
 				*{"$pkg$prefix$name"} = sub () { $n };
 			}
 		} else {
@@ -178,6 +166,9 @@ ever use this feature...?
 =head1 HISTORY
 
  $Log: enum.pm,v $
+ Revision 1.10  1998/06/12 20:12:50  byron
+ 	-Removed test code
+
  Revision 1.9  1998/06/12 00:21:00  byron
  	-Fixed -w warning when a null tag is used
 

@@ -1,4 +1,7 @@
      $Log: enum.pm,v $
+     Revision 1.10  1998/06/12 20:12:50  byron
+            -Removed test code
+
      Revision 1.9  1998/06/12 00:21:00  byron
             -Fixed -w warning when a null tag is used
 
