@@ -4,7 +4,7 @@ no strict 'refs';  # Let's just make this very clear right off
 
 use Carp;
 use vars qw($VERSION);
-$VERSION = do { my @r = (q$Revision: 1.15 $ =~ /\d+/g); sprintf '%d.%03d'.'%02d' x ($#r-1), @r};
+$VERSION = do { my @r = (q$Revision: 1.16 $ =~ /\d+/g); sprintf '%d.%03d'.'%02d' x ($#r-1), @r};
 
 my $Ident = '[^\W_0-9]\w*';
 
@@ -63,7 +63,15 @@ sub import {
                 $index =~ s/_//g;
             }
 
-            $index  = "$neg$index";
+            ## Force numeric context, but only in numeric context
+            if ($index =~ /\D/) {
+                $index  = "$neg$index";
+            }
+            else {
+                $index  = "$neg$index";
+                $index  += 0;
+            }
+
             my $n   = $index;
 
             if ($mode == BITMASK) {
@@ -108,7 +116,14 @@ sub import {
                         $index =~ s/_//g;
                     }
 
-                    $index = "$neg$index";
+                    ## Force numeric context, but only in numeric context
+                    if ($index =~ /\D/) {
+                        $index  = "$neg$index";
+                    }
+                    else {
+                        $index  = "$neg$index";
+                        $index  += 0;
+                    }
 
                     ## Bitmask mode must check index changes
                     if ($mode == BITMASK) {
@@ -282,6 +297,19 @@ ever use this feature...?
 =head1 HISTORY
 
   $Log: enum.pm,v $
+  Revision 1.16  1999/05/27 16:00:35  byron
+
+
+  Fixed bug that caused bitwise operators to treat enum types as strings
+  instead of numbers.
+
+  Revision 1.15  1999/05/27 15:51:27  byron
+
+
+  Add support for negative values.
+
+  Added stricter hex value checks.
+
   Revision 1.14  1999/05/13 15:58:18  byron
 
 
