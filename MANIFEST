@@ -1,5 +1,11 @@
 Changes
+README
+INSTALL
 MANIFEST
 Makefile.PL
 enum.pm
-test.pl
+t/dot_dot.t
+t/new_index.t
+t/new_package.t
+t/new_tag.t
+t/simple_tags.t
