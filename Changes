@@ -1,4 +1,7 @@
      $Log: enum.pm,v $
+     Revision 1.9  1998/06/12 00:21:00  byron
+            -Fixed -w warning when a null tag is used
+
      Revision 1.8  1998/06/11 23:04:53  byron
             -Fixed documentation bugs
             -Moved A..Z case to last as it's not going to be used
