@@ -1,9 +1,14 @@
 use strict;
-my ($ok, $total, @foo);
-BEGIN { $ok=0; $| = 1 }
-END { print "not ok 1\n" unless $ok }
+use vars qw($test $ok $total @foo);
+sub OK { print "ok " . $test++ . "\n" }
+sub NOT_OK { print "not ok " . $test++ . "\n"};
+
+BEGIN { $test = 1; $ok=0; $| = 1 }
+END { NOT_OK unless $ok }
+
+use enum;
 $ok++;
-print "ok $ok\n";
+OK;
 
 use enum qw(Foo Bar Cat Dog);
 use enum qw(
@@ -22,16 +27,14 @@ $foo[Bar] = "Bar";
 $foo[Cat] = "Cat";
 $foo[Dog] = "Dog";
 
-if (Foo != 0 or Bar != 1 or Cat != 2 or Dog != 3) {
-	print "not ok 2";
-} else {
-	print "ok ", ++$ok, "\n";
-}
+#2
+(Foo != 0 or Bar != 1 or Cat != 2 or Dog != 3)
+	? NOT_OK
+	: OK;
 
-if ($foo[Foo] ne "Foo" or $foo[Bar] ne "Bar" or $foo[Cat] ne "Cat" or $foo[Dog] ne "Dog") {
-	print "not ok 3\n";
-} else {
-	print "ok ", ++$ok, "\n";
-}
+#3
+($foo[Foo] ne "Foo" or $foo[Bar] ne "Bar" or $foo[Cat] ne "Cat" or $foo[Dog] ne "Dog")
+	? NOT_OK
+	: OK;
 
 BEGIN { $total = 3; print "1..$total\n" }

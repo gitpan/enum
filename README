@@ -1,6 +1,9 @@
     Defines a set of symbolic constants with ordered numeric values ala C
     enum types.
 
+    Now capable of creating creating ordered bitmask constants as well. See
+    the BITMASKS section for details.
+
     What are they good for? Typical uses would be for giving mnemonic names
     to indexes of arrays. Such arrays might be a list of months, days, or a
     return value index from a function such as localtime():
@@ -18,25 +21,7 @@
           print "It's Friday!\n";
       }
 
-    Another useful use of enum array index names is when using an array ref
-    instead of a hash ref for building objects:
-
-      package My::Class;
-      use strict;
-
-      use enum qw(Field Names You Want To Use);
-      sub new {
-          my $class = shift;
-          my $self  = [];
-
-          $self->[Field] = 'value'; # Field is '0'
-          $self->[Names] = 'value'; # Names is '1'
-          $self->[You]   = 'value'; # etc...
-          $self->[Want]  = 'value';
-          $self->[To]    = ['some', 'list'];
-          $self->[Use]   = 'value';
-          return bless $self, $class;
-      }
-
-    This has a couple of advantages over using a hash ref and keys:
+    This not only reads easier, but can also be typo-checked at compile time
+    when run under use strict. That is, if you misspell Days_Fri as
+    Days_Fry, you'll generate a compile error.
 

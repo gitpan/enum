@@ -4,9 +4,12 @@ no strict 'refs';  # Let's just make this very clear right off
 
 use Carp;
 use vars qw($VERSION);
-$VERSION = do { my @r = (q$Revision: 1.10 $ =~ /\d+/g); sprintf '%d.%03d'.'%02d' x ($#r-1), @r};
+$VERSION = do { my @r = (q$Revision: 1.11 $ =~ /\d+/g); sprintf '%d.%03d'.'%02d' x ($#r-1), @r};
 
 my $Ident = '[^\W_0-9]\w*';
+
+use constant ENUM		=> 1;
+use constant BITMASK	=> 2;
 
 sub import {
 	my $class	= shift;
@@ -14,32 +17,107 @@ sub import {
 	my $pkg		= caller() . '::';
 	my $prefix	= '';	# default no prefix 
 	my $index	= 0;	# default start index
+	my $mode	= ENUM;	# default to enum
 
 	## Pragmas should be as fast as they can be, so we inline some
 	## pieces.
 	foreach (@_) {
-		if (/^$Ident$/o) {							## Plain tag is most common case
-			my $n = $index++;
+		## Plain tag is most common case
+		if (/^$Ident$/o) {
+			my $n = $index;
+
+			if ($mode == ENUM) {
+				$index++;
+			}
+			elsif ($mode == BITMASK) {
+				$index ||= 1;
+				$index *= 2;
+				if ( $index & ($index - 1) ) {
+					croak (
+						"$index is not a valid single bitmask "
+						. " (Maybe you overflowed your system's max int value?)"
+					);
+				}
+			}
+			else {
+				confess qq(Can't Happen: mode $mode invalid);
+			}
+
 			*{"$pkg$prefix$_"} = sub () { $n };
-		} elsif (/^($Ident)=(.+)$/o) {				## Index change
+		}
+
+		## Index change
+		elsif (/^($Ident)=(.+)$/o) {
 			$index	= $2;
-			my $n	= $index++;
+			my $n	= $index;
+
+			if ($mode == BITMASK) {
+				($index & ($index - 1))
+					and croak "$index is not a valid single bitmask";
+				$index *= 2;
+			}
+			elsif ($mode == ENUM) {
+				$index++;
+			}
+			else {
+				confess qq(Can't Happen: mode $mode invalid);
+			}
+
 			*{"$pkg$prefix$1"} = sub () { $n };
-		} elsif (/^:($Ident)?(=?)(.*)/) {			## Prefix change
-			if ($2) {								## Index change too?
-				if (length $3) {
-					$index = $3;
-				} else {
+		}
+
+		## Prefix/option change
+		elsif (/^([A-Z]*):($Ident)?(=?)(.*)/) {
+			## Option change
+			if ($1) {
+				if		($1 eq 'ENUM')		{ $mode = ENUM;		$index = 0 }
+				elsif	($1 eq 'BITMASK')	{ $mode = BITMASK;	$index = 1 }
+				else	{ croak qq(Invalid enum option '$1') }
+			}
+
+			## Index change too?
+			if ($3) {
+				if (length $4) {
+					$index = $4;
+
+					## Bitmask mode must check index changes
+					if ($mode == BITMASK) {
+						($index & ($index - 1))
+							and croak "$index is not a valid single bitmask";
+					}
+				}
+				else {
 					croak qq(No index value defined after "=");
 				}
 			}
-			$prefix = defined $1 ? $1 : '';  ## Incase it's a null prefix
-		} elsif (/^($Ident)\.\.($Ident)$/o) {		## A..Z case magic lists
-			foreach my $name ("$1" .. "$2") {		## Almost never used, so check last
-				my $n = $index++;
+
+			## Incase it's a null prefix
+			$prefix = defined $2 ? $2 : '';
+		}
+
+		## A..Z case magic lists
+		elsif (/^($Ident)\.\.($Ident)$/o) {
+			## Almost never used, so check last
+			foreach my $name ("$1" .. "$2") {
+				my $n = $index;
+
+				if ($mode == BITMASK) {
+					($index & ($index - 1))
+						and croak "$index is not a valid single bitmask";
+					$index *= 2;
+				}
+				elsif ($mode == ENUM) {
+					$index++;
+				}
+				else {
+					confess qq(Can't Happen: mode $mode invalid);
+				}
+
 				*{"$pkg$prefix$name"} = sub () { $n };
 			}
-		} else {
+		}
+
+		else {
 			croak qq(Can't define "$_" as enum type (name contains invalid characters));
 		}
 	}
@@ -52,24 +130,21 @@ __END__
 
 =head1 NAME
 
-enum - C style enumerated types in Perl
+enum - C style enumerated types and bitmask flags in Perl
 
 =head1 SYNOPSIS
 
-  use enum qw(Zero One Two Three Four);
-  # Zero == 0, One == 1, Two == 2, etc
+  use enum qw(Sun Mon Tue Wed Thu Fri Sat);
+  # Sun == 0, Mon == 1, etc
 
   use enum qw(Forty=40 FortyOne Five=5 Six Seven);
   # Yes, you can change the start indexs at any time as in C
-
-  use enum qw(Sun Mon Tue Wed Thu Fri Sat);
-  # Sun == 0, Mon == 1, etc
 
   use enum qw(:Prefix_ One Two Three);
   ## Creates Prefix_One, Prefix_Two, Prefix_Three
 
   use enum qw(:Letters_ A..Z);
-  ## Creates Letters_A, Letters_B, etc
+  ## Creates Letters_A, Letters_B, Letters_C, ...
 
   use enum qw(
       :Months_=0 Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec
@@ -78,9 +153,18 @@ enum - C style enumerated types in Perl
   );
   ## Prefixes can be changed mid list and can have index changes too
 
+  use enum qw(BITMASK:LOCK_ SH EX NB UN);
+  ## Creates bitmask constants for LOCK_SH == 1, LOCK_EX == 2,
+  ## LOCK_NB == 4, and LOCK_UN == 8.
+  ## NOTE: This example is only valid on FreeBSD-2.2.5 however, so don't
+  ## actually do this.  Import from Fnctl instead.
+
 =head1 DESCRIPTION
 
 Defines a set of symbolic constants with ordered numeric values ala B<C> B<enum> types.
+
+Now capable of creating creating ordered bitmask constants as well.  See the B<BITMASKS>
+section for details.
 
 What are they good for?  Typical uses would be for giving mnemonic names to indexes of
 arrays.  Such arrays might be a list of months, days, or a return value index from
@@ -99,119 +183,125 @@ a function such as localtime():
       print "It's Friday!\n";
   }
 
-Another useful use of enum array index names is when using an array ref instead of
-a hash ref for building objects:
+This not only reads easier, but can also be typo-checked at compile time when
+run under B<use strict>.  That is, if you misspell B<Days_Fri> as B<Days_Fry>,
+you'll generate a compile error.
 
-  package My::Class;
-  use strict;
+=head1 BITMASKS, bitwise operations, and bitmask option values
 
-  use enum qw(Field Names You Want To Use);
-  sub new {
-      my $class = shift;
-      my $self  = [];
+The B<BITMASK> option allows the easy creation of bitmask constants such as
+functions like flock() and sysopen() use.  These are also very useful for your
+own code as they allow you to efficiently store many true/false options within
+a single integer.
 
-      $self->[Field] = 'value'; # Field is '0'
-      $self->[Names] = 'value'; # Names is '1'
-      $self->[You]   = 'value'; # etc...
-      $self->[Want]  = 'value';
-      $self->[To]    = ['some', 'list'];
-      $self->[Use]   = 'value';
-      return bless $self, $class;
-  }
+    use enum qw(BITMASK: MY_ FOO BAR CAT DOG);
 
-This has a couple of advantages over using a hash ref and keys:
+    my $foo = 0;
+    $foo |= MY_FOO;
+    $foo |= MY_DOG;
+    
+    if ($foo & MY_DOG) {
+        print "foo has the MY_DOG option set\n";
+    }
+    if ($foo & (MY_BAR | MY_DOG)) {
+        print "foo has either the MY_BAR or MY_DOG option set\n"
+	}
 
-=over 4
+    $foo ^= MY_DOG;  ## Turn MY_DOG option off (set its bit to false)
 
-=item Speed
+When using bitmasks, remember that you must use the bitwise operators, B<|>, B<&>, B<^>,
+and B<~>.  If you try to do an operation like C<$foo += MY_DOG;> and the B<MY_DOG> bit
+has already been set, you'll end up setting other bits you probably didn't want to set.
+You'll find the documentation for these operators in the B<perlop> manpage.
 
-Using an array ref for an object yields much faster access times then a hash ref.
-Because the symbolic constants this module defines will be inlined by the perl
-interpreter there is no run time over head for name look up as there is when using
-a hash style object.
+You can set a starting index for bitmasks just as you can for normal B<enum> values,
+but if the given index isn't a power of 2 it won't resolve to a single bit and therefor
+will generate a compile error.  Because of this, whenever you set the B<BITFIELD:>
+directive, the index is automatically set to 1.  If you wish to go back to normal B<enum>
+mode, use the B<ENUM:> directive.  Similarly to the B<BITFIELD> directive, the B<ENUM:>
+directive resets the index to 0.  Here's an example:
 
-=item Error Checking
+  use enum qw(
+      BITMASK:BITS_ FOO BAR CAT DOG
+      ENUM: FALSE TRUE
+      ENUM: NO YES
+      BITMASK: ONE TWO FOUR EIGHT SIX_TEEN
+  );
 
-Because these names are used as bare words, when B<use strict> is applied it will
-cause compile time errors if you misspell a field name.  Conversely traditional hash
-value lookups are very prone to this type of error and will never cause a compile time
-error or warning, and in some cases no warning at all.
-
-This module is very similar to the B<constant> module.  In fact, these statements
-are the same:
-
-  use constant Foo => 0; use constant Bar => 1;
-  use enum qw(Foo Bar);
-
-Using B<-w> will cause compile time warnings to be produced if you accidently override
-a field with a method name or vis-versa.
-
-=back
+In this case, B<BITS_FOO, BITS_BAR, BITS_CAT, and BITS_DOG> equal 1, 2, 4 and
+8 respectively.  B<FALSE and TRUE> equal 0 and 1.  B<NO and YES> also equal
+0 and 1.  And B<ONE, TWO, FOUR, EIGHT, and SIX_TEEN> equal, you guessed it, 1,
+2, 4, 8, and 16.
 
 =head1 BUGS
 
 Enum names can not be the same as method, function, or constant names.  This
 is probably a Good Thing[tm].
 
-No way to cause compile time errors when one of these enum names get redefined.
-IMHO, there is absolutely no time when redefining a sub is a Good Thing[tm], and
-should be taken out of the language.
+No way (that I know of) to cause compile time errors when one of these enum names get
+redefined.  IMHO, there is absolutely no time when redefining a sub is a Good Thing[tm],
+and should be taken out of the language, or at least have a pragma that can cause it
+to be a compile time error.
 
 Enumerated types are package scoped just like constants, not block scoped as some
 other pragma modules are.
 
-Supports A..Z nonsense.  Can anyone give me a Real World[tm] reason why anyone would
+It supports A..Z nonsense.  Can anyone give me a Real World[tm] reason why anyone would
 ever use this feature...?
 
 =head1 HISTORY
 
- $Log: enum.pm,v $
- Revision 1.10  1998/06/12 20:12:50  byron
- 	-Removed test code
+  $Log: enum.pm,v $
+  Revision 1.11  1998/07/18 17:53:05  byron
+  	-Added BITMASK and ENUM directives.
+  	-Revamped documentation.
 
- Revision 1.9  1998/06/12 00:21:00  byron
+  Revision 1.10  1998/06/12 20:12:50  byron
+  	-Removed test code
+  	-Released to CPAN
+
+  Revision 1.9  1998/06/12 00:21:00  byron
  	-Fixed -w warning when a null tag is used
 
- Revision 1.8  1998/06/11 23:04:53  byron
- 	-Fixed documentation bugs
- 	-Moved A..Z case to last as it's not going to be used
- 	 as much as the other cases.
+  Revision 1.8  1998/06/11 23:04:53  byron
+	-Fixed documentation bugs
+	-Moved A..Z case to last as it's not going to be used
+	 as much as the other cases.
 
- Revision 1.7  1998/06/10 12:25:04  byron
- 	-Changed interface to match original design by Tom Phoenix
- 	 as implemented in an early version of enum.pm by Benjamin Holzman.
- 	-Changed tag syntax to not require the 'PREFIX' string of Tom's
- 	 interface.
- 	-Allow multiple prefix tags to be used at any point.
- 	-Allowed index value changes from tags.
+  Revision 1.7  1998/06/10 12:25:04  byron
+	-Changed interface to match original design by Tom Phoenix
+	 as implemented in an early version of enum.pm by Benjamin Holzman.
+	-Changed tag syntax to not require the 'PREFIX' string of Tom's
+	 interface.
+	-Allow multiple prefix tags to be used at any point.
+	-Allowed index value changes from tags.
 
- Revision 1.6  1998/06/10 03:37:57  byron
- 	-Fixed superfulous -w warning
+  Revision 1.6  1998/06/10 03:37:57  byron
+	-Fixed superfulous -w warning
 
- Revision 1.5  1998/06/10 01:31:12  byron
- 	-Fixed typo in docs
-
- Revision 1.4  1998/06/10 01:07:03  byron
- 	-Changed behaver to closer resemble C enum types
- 	-Changed docs to match new behaver
-
- Revision 1.3  1998/06/08 16:28:58  byron
- 	-Changed name from fields to enum
-
- Revision 1.1  1998/06/01 18:02:06  byron
- Initial revision
+  Revision 1.4  1998/06/10 01:07:03  byron
+	-Changed behaver to closer resemble C enum types
+	-Changed docs to match new behaver
 
 =head1 AUTHOR
 
 Zenin <zenin@archive.rhps.org>
 
-aka Byron Brummer <byron@thrush.omix.com>.
+aka Byron Brummer <byron@omix.com>.
 
 Based off of the B<constant> module by Tom Phoenix.
 
 Original implementation of an interface of Tom Phoenix's
 design by Benjamin Holzman, for which we borrow the basic
 parse algorithm layout.
+
+=head1 COPYRIGHT
+
+Copyright 1998 (c) Byron Brummer.
+Copyright 1998 (c) OMIX, Inc.
+
+Permission to use, modify, and redistribute this module granted under
+the same terms as B<Perl>.
 
 =head1 SEE ALSO
 
