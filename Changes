@@ -1,0 +1,30 @@
+     $Log: enum.pm,v $
+     Revision 1.8  1998/06/11 23:04:53  byron
+            -Fixed documentation bugs
+            -Moved A..Z case to last as it's not going to be used
+             as much as the other cases.
+
+     Revision 1.7  1998/06/10 12:25:04  byron
+            -Changed interface to match original design by Tom Phoenix
+             as implemented in an early version of enum.pm by Benjamin Holzman.
+            -Changed tag syntax to not require the 'PREFIX' string of Tom's
+             interface.
+            -Allow multiple prefix tags to be used at any point.
+            -Allowed index value changes from tags.
+
+     Revision 1.6  1998/06/10 03:37:57  byron
+            -Fixed superfulous -w warning
+
+     Revision 1.5  1998/06/10 01:31:12  byron
+            -Fixed typo in docs
+
+     Revision 1.4  1998/06/10 01:07:03  byron
+            -Changed behaver to closer resemble C enum types
+            -Changed docs to match new behaver
+
+     Revision 1.3  1998/06/08 16:28:58  byron
+            -Changed name from fields to enum
+
+     Revision 1.1  1998/06/01 18:02:06  byron
+     Initial revision
+

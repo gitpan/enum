@@ -1,0 +1,8 @@
+     Basic perl module install:
+            gunzip -c enum-1.008.tar.gz | tar -xvf -
+            cd enum-1.008
+            perl Makefile.pl
+            make
+            make test
+            make install
+

@@ -1,0 +1,42 @@
+    Defines a set of symbolic constants with ordered numeric values ala C
+    enum types.
+
+    What are they good for? Typical uses would be for giving mnemonic names
+    to indexes of arrays. Such arrays might be a list of months, days, or a
+    return value index from a function such as localtime():
+
+      use enum qw(
+          :Months_=0 Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec
+          :Days_=0   Sun Mon Tue Wed Thu Fri Sat
+          :LC_=0     Sec Min Hour MDay Mon Year WDay YDay Isdst
+      );
+
+      if ((localtime)[LC_Mon] == Months_Jan) {
+          print "It's January!\n";
+      }
+      if ((localtime)[LC_WDay] == Days_Fri) {
+          print "It's Friday!\n";
+      }
+
+    Another useful use of enum array index names is when using an array ref
+    instead of a hash ref for building objects:
+
+      package My::Class;
+      use strict;
+
+      use enum qw(Field Names You Want To Use);
+      sub new {
+          my $class = shift;
+          my $self  = [];
+
+          $self->[Field] = 'value'; # Field is '0'
+          $self->[Names] = 'value'; # Names is '1'
+          $self->[You]   = 'value'; # etc...
+          $self->[Want]  = 'value';
+          $self->[To]    = ['some', 'list'];
+          $self->[Use]   = 'value';
+          return bless $self, $class;
+      }
+
+    This has a couple of advantages over using a hash ref and keys:
+
