@@ -4,7 +4,7 @@ no strict 'refs';  # Let's just make this very clear right off
 
 use Carp;
 use vars qw($VERSION);
-$VERSION = do { my @r = (q$Revision: 1.13 $ =~ /\d+/g); sprintf '%d.%03d'.'%02d' x ($#r-1), @r};
+$VERSION = do { my @r = (q$Revision: 1.14 $ =~ /\d+/g); sprintf '%d.%03d'.'%02d' x ($#r-1), @r};
 
 my $Ident = '[^\W_0-9]\w*';
 
@@ -52,7 +52,7 @@ sub import {
             $index  = $2;
 
             ## Convert non-decimal numerics to decimal
-            if ($index =~ /^0x\d/i) {       ## Hex
+            if ($index =~ /^0x[\da-f]/i) {       ## Hex
                 $index = hex $index;
             }
             elsif ($index =~ /^0\d/) {      ## Oct
@@ -94,7 +94,7 @@ sub import {
                     $index = $4;
 
                     ## Convert non-decimal numerics to decimal
-                    if ($index =~ /^0x\d/i) {       ## Hex
+                    if ($index =~ /^0x[\da-f]/i) {       ## Hex
                         $index = hex $index;
                     }
                     elsif ($index =~ /^0\d/) {      ## Oct
@@ -276,6 +276,11 @@ ever use this feature...?
 =head1 HISTORY
 
   $Log: enum.pm,v $
+  Revision 1.14  1999/05/13 15:58:18  byron
+
+
+  Fixed bug in hex index code that broke on 0xA.
+
   Revision 1.13  1999/05/13 10:52:30  byron
 
 
