@@ -1,57 +1,29 @@
-enum version 0.01
-=================
+The 'enum' module for Perl
 
-This class provides an enumeration class for Perl.  For those who are
-unfamiliar with the concept from other programming language, an
-enumeration is a class whose objects may only be assigned values from
-a fixed list specified by the class.
+This module is used to efine a set of symbolic constants with ordered numeric values
+similar to enum types in the C programming language.
 
-INSTALLATION
+Now capable of creating creating ordered bitmask constants as well. See
+the BITMASKS section for details.
 
-To install this module type the following:
+What are they good for? Typical uses would be for giving mnemonic names
+to indexes of arrays. Such arrays might be a list of months, days, or a
+return value index from a function such as localtime():
 
-   perl Build.PL
-   perl Build
-   perl Build test
-   perl Build install
+  use enum qw(
+      :Months_=0 Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec
+      :Days_=0   Sun Mon Tue Wed Thu Fri Sat
+      :LC_=0     Sec Min Hour MDay Mon Year WDay YDay Isdst
+  );
 
-If you do not have Module::Build, you can use the older steps:
+  if ((localtime)[LC_Mon] == Months_Jan) {
+      print "It's January!\n";
+  }
+  if ((localtime)[LC_WDay] == Days_Fri) {
+      print "It's Friday!\n";
+  }
 
-   perl Makefile.PL
-   make
-   make test
-   make install
+This not only reads easier, but can also be typo-checked at compile time
+when run under use strict. That is, if you misspell Days_Fri as
+Days_Fry, you'll generate a compile error.
 
-On Windows, you will need to use nmake instead of make.
-
-DEPENDENCIES
-
-This module requires these other modules and libraries:
-
- overload
- Scalar::Util
- Carp
-
-Fortunately, these modules come with Perl's default installation.
-
-COPYRIGHT AND LICENCE
-
-Copyright (c) 2008 by Eric J. Roode, ROODE I<-at-> cpan I<-dot-> org
-
-All rights reserved.
-
-This module is copyrighted only to ensure proper attribution of
-authorship and to ensure that it remains available to all.  This
-module is free, open-source software.  This module may be freely used
-for any purpose, commercial, public, or private, provided that proper
-credit is given, and that no more-restrictive license is applied to
-derivative (not dependent) works.
-
-Substantial efforts have been made to ensure that this software meets
-high quality standards; however, no guarantee can be made that there
-are no undiscovered bugs, and no warranty is made as to suitability to
-any given use, including merchantability.  Should this module cause
-your house to burn down, your dog to collapse, your heart-lung machine
-to fail, your spouse to desert you, or George Bush to be re-elected, I
-can offer only my sincere sympathy and apologies, and promise to
-endeavor to improve the software.

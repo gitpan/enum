@@ -1,17 +1,13 @@
 Changes
-Build.PL
-Makefile.PL
-MANIFEST
 README
-t/Color.pm
-t/SubClass.pm
-t/WeirdChars.pm
-t/doc.t
-t/enum.t
-t/equality.t
-t/free.t
-t/import.t
-t/no_import.t
-t/sub.t
+INSTALL
+MANIFEST
+Makefile.PL
 lib/enum.pm
-META.yml
+t/dot_dot.t
+t/new_index.t
+t/new_package.t
+t/new_tag.t
+t/simple_tags.t
+META.yml                                 Module YAML meta-data (added by MakeMaker)
+META.json                                Module JSON meta-data (added by MakeMaker)

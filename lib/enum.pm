@@ -1,509 +1,321 @@
-=head1 NAME
-
-enum - Yet Another enumeration class implementation.
-
-=head1 VERSION
-
-This is version 0.01 of enum, of March 13, 2008.
-
-=cut
-
+package enum;
 use strict;
 use warnings;
-package enum;
-$enum::VERSION = '0.01';
+no strict 'refs';  # Let's just make this very clear right off
 
-use Scalar::Util qw(refaddr);
+use Carp;
+our $VERSION = '1.016_01';
 
-use overload '""' => \&value,
-             'eq' => \&equals,
-             'ne' => \&not_equals;
+my $Ident = '[^\W_0-9]\w*';
 
-# Auto-croaking saves program startup time:
-sub croak { require Carp; goto &Carp::croak }
+sub ENUM    () { 1 }
+sub BITMASK () { 2 }
 
-# Enumeration constants for each subclass
-my %class_symbols;
+sub import {
+    my $class   = shift;
+    @_ or return;       # Ignore 'use enum;'
+    my $pkg     = caller() . '::';
+    my $prefix  = '';   # default no prefix 
+    my $index   = 0;    # default start index
+    my $mode    = ENUM; # default to enum
 
-# This should ONLY be called by subclasses.
-# Call as:    __PACKAGE__->set_enumerations(@list_of_symbols);
-sub set_enumerations
-{
-    my $class = shift;
-    $class_symbols{$class}{$_} = 1 for @_;
-    return 1;
+    ## Pragmas should be as fast as they can be, so we inline some
+    ## pieces.
+    foreach (@_) {
+        ## Plain tag is most common case
+        if (/^$Ident$/o) {
+            my $n = $index;
+
+            if ($mode == ENUM) {
+                $index++;
+            }
+            elsif ($mode == BITMASK) {
+                $index ||= 1;
+                $index *= 2;
+                if ( $index & ($index - 1) ) {
+                    croak (
+                        "$index is not a valid single bitmask "
+                        . " (Maybe you overflowed your system's max int value?)"
+                    );
+                }
+            }
+            else {
+                confess qq(Can't Happen: mode $mode invalid);
+            }
+
+            *{"$pkg$prefix$_"} = sub () { $n };
+        }
+
+        ## Index change
+        elsif (/^($Ident)=(-?)(.+)$/o) {
+            my $name= $1;
+            my $neg = $2;
+            $index  = $3;
+
+            ## Convert non-decimal numerics to decimal
+            if ($index =~ /^0x[\da-f]+$/i) {    ## Hex
+                $index = hex $index;
+            }
+            elsif ($index =~ /^0\d/) {          ## Octal
+                $index = oct $index;
+            }
+            elsif ($index !~ /[^\d_]/) {        ## 123_456 notation
+                $index =~ s/_//g;
+            }
+
+            ## Force numeric context, but only in numeric context
+            if ($index =~ /\D/) {
+                $index  = "$neg$index";
+            }
+            else {
+                $index  = "$neg$index";
+                $index  += 0;
+            }
+
+            my $n   = $index;
+
+            if ($mode == BITMASK) {
+                ($index & ($index - 1))
+                    and croak "$index is not a valid single bitmask";
+                $index *= 2;
+            }
+            elsif ($mode == ENUM) {
+                $index++;
+            }
+            else {
+                confess qq(Can't Happen: mode $mode invalid);
+            }
+
+            *{"$pkg$prefix$name"} = sub () { $n };
+        }
+
+        ## Prefix/option change
+        elsif (/^([A-Z]*):($Ident)?(=?)(-?)(.*)/) {
+            ## Option change
+            if ($1) {
+                if      ($1 eq 'ENUM')      { $mode = ENUM;     $index = 0 }
+                elsif   ($1 eq 'BITMASK')   { $mode = BITMASK;  $index = 1 }
+                else    { croak qq(Invalid enum option '$1') }
+            }
+
+            my $neg = $4;
+
+            ## Index change too?
+            if ($3) {
+                if (length $5) {
+                    $index = $5;
+
+                    ## Convert non-decimal numerics to decimal
+                    if ($index =~ /^0x[\da-f]+$/i) {    ## Hex
+                        $index = hex $index;
+                    }
+                    elsif ($index =~ /^0\d/) {          ## Oct
+                        $index = oct $index;
+                    }
+                    elsif ($index !~ /[^\d_]/) {        ## 123_456 notation
+                        $index =~ s/_//g;
+                    }
+
+                    ## Force numeric context, but only in numeric context
+                    if ($index =~ /\D/) {
+                        $index  = "$neg$index";
+                    }
+                    else {
+                        $index  = "$neg$index";
+                        $index  += 0;
+                    }
+
+                    ## Bitmask mode must check index changes
+                    if ($mode == BITMASK) {
+                        ($index & ($index - 1))
+                            and croak "$index is not a valid single bitmask";
+                    }
+                }
+                else {
+                    croak qq(No index value defined after "=");
+                }
+            }
+
+            ## Incase it's a null prefix
+            $prefix = defined $2 ? $2 : '';
+        }
+
+        ## A..Z case magic lists
+        elsif (/^($Ident)\.\.($Ident)$/o) {
+            ## Almost never used, so check last
+            foreach my $name ("$1" .. "$2") {
+                my $n = $index;
+
+                if ($mode == BITMASK) {
+                    ($index & ($index - 1))
+                        and croak "$index is not a valid single bitmask";
+                    $index *= 2;
+                }
+                elsif ($mode == ENUM) {
+                    $index++;
+                }
+                else {
+                    confess qq(Can't Happen: mode $mode invalid);
+                }
+
+                *{"$pkg$prefix$name"} = sub () { $n };
+            }
+        }
+
+        else {
+            croak qq(Can't define "$_" as enum type (name contains invalid characters));
+        }
+    }
 }
 
-# Return a list of enumerations allowable in the given class.
-sub enumerations
-{
-    my $class = shift;
-    return keys %{ $class_symbols{$class} };
-}
+1;
 
-sub import
-{
-    my $class = shift;
-    my $import = @_ && $_[0] eq ':all';
-
-    my $cpkg = caller;
-    foreach my $sym (keys %{$class_symbols{$class}})
-    {
-        no strict 'refs';
-        my $full_name  = $cpkg  . '::' . $sym;
-        my $local_name = $class . '::' . $sym;
-
-        *$full_name  = sub () { $sym } if $import;
-        *$local_name = sub () { $sym }
-    }
-}
-
-
-# OO enclosure.
-{
-    # Enumeration constants for objects created directly from the enum class.
-    my %instance_symbols;
-    my %instance_value;
-
-    sub new
-    {
-        my $class = shift;
-        my $self = bless \do { my $dummy } => $class;
-
-        # Caller is creating an on-the-fly enumeration
-        if ($class eq 'enum')
-        {
-            my %values = map {$_ => 1} @_;
-            $instance_symbols{refaddr $self} = \%values;
-        }
-        else    # Caller is using a subclass
-        {
-            croak "Too many arguments to ${class}->new" if @_ > 1;
-            $instance_symbols{refaddr $self} = $class_symbols{$class};
-            $self->set(shift) if @_;
-        }
-
-        return $self;
-    }
-
-    sub DESTROY
-    {
-        my $self = shift;
-        delete $instance_symbols{refaddr $self};
-        delete $instance_value{refaddr $self};
-    }
-
-    # Is a given value in the list of enumeration values that are legal
-    # for this class or object?
-    sub is_allowable_value
-    {
-        my $what = shift;    # may be class name string or an object reference
-        my $value = shift;
-        return 1 if not defined $value;    # undef is always allowed.
-
-        # It's a "free" enum object -- instance contains the allowable values.
-        if (ref $what eq 'enum')
-        {
-            return $instance_symbols{refaddr $what}{$value};
-        }
-
-        # It's a subclass-based object -- enumeration is at the class level.
-        $what = ref ($what) || $what;
-        return $class_symbols{$what}{$value};
-    }
-
-    # simple internal routine for generating a consistent error message
-    # throughout.
-    sub _check
-    {
-        croak qq{"$_[1]" is not an allowable value}
-            if not $_[0]->is_allowable_value($_[1]);
-    }
-
-    # Set the object's value.
-    sub set
-    {
-        my $self  = shift;
-        my $value = shift;
-
-        $self->_check($value);
-        $instance_value{refaddr $self} = $value;
-    }
-
-    # Return the object's value.
-    sub value
-    {
-        my $self  = shift;
-        return ref($self) . '::' . $instance_value{refaddr $self}
-    }
-    sub bare_value
-    {
-        my $self  = shift;
-        return $instance_value{refaddr $self}
-    }
-
-    # Query the object's status; check to see if it is a given value.
-    sub is
-    {
-        my $self  = shift;
-        my $value = shift;
-
-        # Comparing to another enum object?
-        if (ref $value && $value->isa('enum'))
-        {
-            # Compatible classes?  Equivalent values?
-            return ref $value eq ref $self  &&
-                   _defeq($instance_value{refaddr $self},
-                          $instance_value{refaddr $value});
-        }
-
-        $self->_check($value);
-        return _defeq($instance_value{refaddr $self}, $value);
-    }
-
-    # "Complex" equality:
-    #     If either value is undef, then they're equal only if both are undef
-    #     Otherwise, just a simple string equality.
-    sub _defeq
-    {
-        my ($v1, $v2) = @_;
-
-        return (!defined $v1 && !defined $v2)
-            if (!defined $v1 || !defined $v2);
-
-        return $v1 eq $v2;
-    }
-
-    # Query the object's status; check to see if it is any of a number
-    # of possible values.
-    # Each status passed must be an allowable value.
-    sub is_any
-    {
-        my $self = shift;
-
-        foreach my $value (@_)
-        {
-            next if ref $value && $value->isa('enum');
-            $self->_check($value);
-        }
-
-        foreach my $value (@_)
-        {
-            return 1 if $self->is($value);
-        }
-        return;
-    }
-
-    # Opposite of is_any.  (Duh)
-    sub is_none
-    {
-        my $self = shift;
-        return ! $self->is_any(@_);
-    }
-
-    # Overload methods
-
-    sub equals
-    {
-        return $_[0]->is($_[1]);
-    }
-
-    sub not_equals
-    {
-        return ! $_[0]->is($_[1]);
-    }
-
-}
-
-
-return 'a true value';
 __END__
+
+
+=head1 NAME
+
+enum - C style enumerated types and bitmask flags in Perl
 
 =head1 SYNOPSIS
 
- # Usually you will subclass enum, and others will use your subclass.
- use YourSubClass;
- use YourSubClass ':all';   # import enumeration constants
+  use enum qw(Sun Mon Tue Wed Thu Fri Sat);
+  # Sun == 0, Mon == 1, etc
 
- # Class methods (used when subclassing; see below)
- __PACKAGE__->set_enumerations( qw(red yellow blue green) );
+  use enum qw(Forty=40 FortyOne Five=5 Six Seven);
+  # Yes, you can change the start indexs at any time as in C
 
- # Creation
- $var = new enum (@allowable_values);
- $var = new YourSubClass;
- $var = new YourSubClass($initial_value);
+  use enum qw(:Prefix_ One Two Three);
+  ## Creates Prefix_One, Prefix_Two, Prefix_Three
 
- # Set the value
- $var->set($new_value);        # (note: undef is always allowed)
+  use enum qw(:Letters_ A..Z);
+  ## Creates Letters_A, Letters_B, Letters_C, ...
 
- # Return the value
- $string = $var->value;        # "YourSubClass::enum_value"
- $string = $var->bare_value;   # "enum_value"
- $string = "$var";             # same as ->value
+  use enum qw(
+      :Months_=0 Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec
+      :Days_=0   Sun Mon Tue Wed Thu Fri Sat
+      :Letters_=20 A..Z
+  );
+  ## Prefixes can be changed mid list and can have index changes too
 
- # Compare
- $boolean = $var eq $some_value;
- $boolean = $var ne $some_value;
- $boolean = $var->is_any(@list_of_possible_values);
- $boolean = $var->is_none(@list_of_possible_values);
-
- # Test whether some value is a member of the set
- $boolean = YourSubClass->is_allowable_value($some_value);
- $boolean = $var->is_allowable_value($some_value);
+  use enum qw(BITMASK:LOCK_ SH EX NB UN);
+  ## Creates bitmask constants for LOCK_SH == 1, LOCK_EX == 2,
+  ## LOCK_NB == 4, and LOCK_UN == 8.
+  ## NOTE: This example is only valid on FreeBSD-2.2.5 however, so don't
+  ## actually do this.  Import from Fnctl instead.
 
 =head1 DESCRIPTION
 
-This module provides an enumeration class for Perl.  For those of you
-who are not familiar with this concept from other languages, an
-enumeration is a class whose instantiated objects may only be assigned
-values that come from a fixed list.
+Defines a set of symbolic constants with ordered numeric values ala B<C> B<enum> types.
+
+Now capable of creating creating ordered bitmask constants as well.  See the B<BITMASKS>
+section for details.
 
-There are two ways of using this module.  Typically, you will create a
-subclass that inherits from C<enum> and which specifies the list of
-allowable values.  This is very simple.  Your class module will
-contain only three lines of code:
+What are they good for?  Typical uses would be for giving mnemonic names to indexes of
+arrays.  Such arrays might be a list of months, days, or a return value index from
+a function such as localtime():
 
- # MyEnumeration.pm
- #
- package MyEnumeration;
- use base 'enum';
- __PACKAGE__->set_enumerations( qw(red yellow blue green) );
+  use enum qw(
+      :Months_=0 Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec
+      :Days_=0   Sun Mon Tue Wed Thu Fri Sat
+      :LC_=0     Sec Min Hour MDay Mon Year WDay YDay Isdst
+  );
 
-Programs will use this class as follows:
+  if ((localtime)[LC_Mon] == Months_Jan) {
+      print "It's January!\n";
+  }
+  if ((localtime)[LC_WDay] == Days_Fri) {
+      print "It's Friday!\n";
+  }
 
- # some_program.pl
- #
- use MyEnumeration;
- # ....
- my $var = new MyEnumeration(MyEnumeration::yellow);
- # or just: $var = new MyEnumeration;
+This not only reads easier, but can also be typo-checked at compile time when
+run under B<use strict>.  That is, if you misspell B<Days_Fri> as B<Days_Fry>,
+you'll generate a compile error.
 
-Users of your subclass may choose to have all of your enumeration
-symbols imported into their namespace.  They do this by using the
-string C<':all'> on the C<use> line:
+=head1 BITMASKS, bitwise operations, and bitmask option values
 
- use MyEnumeration ':all';
- # ....
- my $var = new MyEnumeration(yellow);
+The B<BITMASK> option allows the easy creation of bitmask constants such as
+functions like flock() and sysopen() use.  These are also very useful for your
+own code as they allow you to efficiently store many true/false options within
+a single integer.
 
-The other way to use this module is for when you need an ad-hoc
-enumeration at run-time:
+    use enum qw(BITMASK: MY_ FOO BAR CAT DOG);
 
- # some_program.pl
- #
- my $var = new enum qw(whee this is fun);
+    my $foo = 0;
+    $foo |= MY_FOO;
+    $foo |= MY_DOG;
+    
+    if ($foo & MY_DOG) {
+        print "foo has the MY_DOG option set\n";
+    }
+    if ($foo & (MY_BAR | MY_DOG)) {
+        print "foo has either the MY_BAR or MY_DOG option set\n"
+    }
 
+    $foo ^= MY_DOG;  ## Turn MY_DOG option off (set its bit to false)
 
-=head1 CLASS METHODS
+When using bitmasks, remember that you must use the bitwise operators, B<|>, B<&>, B<^>,
+and B<~>.  If you try to do an operation like C<$foo += MY_DOG;> and the B<MY_DOG> bit
+has already been set, you'll end up setting other bits you probably didn't want to set.
+You'll find the documentation for these operators in the B<perlop> manpage.
 
-=over 4
+You can set a starting index for bitmasks just as you can for normal B<enum> values,
+but if the given index isn't a power of 2 it won't resolve to a single bit and therefor
+will generate a compile error.  Because of this, whenever you set the B<BITFIELD:>
+directive, the index is automatically set to 1.  If you wish to go back to normal B<enum>
+mode, use the B<ENUM:> directive.  Similarly to the B<BITFIELD> directive, the B<ENUM:>
+directive resets the index to 0.  Here's an example:
 
-=item set_enumerations
+  use enum qw(
+      BITMASK:BITS_ FOO BAR CAT DOG
+      ENUM: FALSE TRUE
+      ENUM: NO YES
+      BITMASK: ONE TWO FOUR EIGHT SIX_TEEN
+  );
 
- __PACKAGE__->set_enumerations(@list_of_values);
+In this case, B<BITS_FOO, BITS_BAR, BITS_CAT, and BITS_DOG> equal 1, 2, 4 and
+8 respectively.  B<FALSE and TRUE> equal 0 and 1.  B<NO and YES> also equal
+0 and 1.  And B<ONE, TWO, FOUR, EIGHT, and SIX_TEEN> equal, you guessed it, 1,
+2, 4, 8, and 16.
 
-If you choose to create an enumeration by subclassing C<enum> (which
-is the typical way of using this module), your module will need to use
-this method to indicate which values are legal for objects to hold.
+=head1 BUGS
 
-Each of these symbols will be converted into a constant in the
-namespace of your subclass module.  This is to make it easy for your
-callers to use the enumerations symbolically:
+Enum names can not be the same as method, function, or constant names.  This
+is probably a Good Thing[tm].
 
- my $thing = new MySubClass;
- $thing->set(MySubClass::yellow);
+No way (that I know of) to cause compile time errors when one of these enum names get
+redefined.  IMHO, there is absolutely no time when redefining a sub is a Good Thing[tm],
+and should be taken out of the language, or at least have a pragma that can cause it
+to be a compile time error.
 
-Users of your module may choose to import your symbols into their own
-namespace as well, by using the special symbol C<':all'> on the
-C<use> line.
+Enumerated types are package scoped just like constants, not block scoped as some
+other pragma modules are.
 
-Users may also use string values (C<'yellow'> instead of
-C<MySubClass::yellow>), but this makes the user's code more
-susceptible to typos, as the strings will be checked at run-time
-instead of at compile-time.
+It supports A..Z nonsense.  Can anyone give me a Real World[tm] reason why anyone would
+ever use this feature...?
 
-Because the values are converted to perl constants (subroutines), it
-makes sense for you to choose enumeration values that are also
-syntactically-valid perl symbols.  That is, they should contain only
-alphanumeric and underscore characters, and should not begin with a
-numeric character.  I<This is not a requirement, just a guideline.>
-It is perfectly valid to use any characters whatsoever; but your users
-will not be able to use the symbolic form if you don't follow this
-guideline.
+=head1 AUTHOR
 
-This method always returns a true value, so your module will compile
-correctly; that is, you do not need the silly "C<1;>" line that
-modules generally need in order to avoid the common "did not return a
-true value" error.
+Originally written by Byron Brummer (ZENIN),
+now maintained by Neil Bowers E<lt>neilb@cpan.orgE<gt>.
 
-=item is_allowable_value
+Based on early versions of the B<constant> module by Tom Phoenix.
 
- $boolean = SomeClass->is_allowable_value(some_value);
+Original implementation of an interface of Tom Phoenix's
+design by Benjamin Holzman, for which we borrow the basic
+parse algorithm layout.
 
-Simple boolean test as to whether a given value is in the enumeration
-list for a given class.
+=head1 COPYRIGHT
 
-=back
+Copyright 1998 (c) Byron Brummer.
+Copyright 1998 (c) OMIX, Inc.
 
-=head1 OBJECT METHODS
+Permission to use, modify, and redistribute this module granted under
+the same terms as B<Perl>.
 
-=over 4
+=head1 SEE ALSO
 
-=item new
-
- $obj = new YourSubClass;
- $obj = new YourSubClass (initial_value);
- $obj = new enum qw(list of allowable values);
-
-Creates a new C<enum> object.  If an ad-hoc list of allowable values
-is provided, an initial value cannot be specified (so use L</set>).
-If an initial value is provided (to an C<enum> subclass), it must be
-C<undef> or in the class's list of enumerated values.  Otherwise, it
-will croak.
-
-=item is_allowable_value
-
- $boolean = $obj->is_allowable_value(some_value);
-
-Returns true if the value specified is an allowable value for the
-object to have.  (This has nothing to do with the object's I<current>
-value; it's a test of whether the value passed I<could> be assigned to
-the object, based on its class's allowable list of values).
-
-=item set
-
- $obj->set(new_value);
-
-Sets the enumeration object's value to the specified new value.
-Croaks if the new value is not allowed for this enumeration.
-
-=item value
-
- $str = $obj->value;
-
-Returns the object's current value as a string.  This string is the
-object's class, two colons, and its enumeration value.  So it is of
-the form:
-
- YourSubClass::your_value
-
-=item bare_value
-
- $str = $obj->bare_value;
-
-Returns the object's current value as a string, I<without> the
-object's class prepended to it.
-
-=item "" (stringification overload)
-
- print "Its value is '$obj'\n";
-
-In string context, an enumeration constant is converted to its current
-value; that is, the same string that L</value> would return.
-
-=item is
-
- $bool = $obj->is(some_value);
- $bool = $obj->is($another_enum_object);
-
-Compares an enumeration object's current value to the specified value,
-or to another enumeration object.
-
-If two objects are being compared, they must be of the same class as
-well as value in order to be considered equal.
-
-If a value is being compared, it must be an allowable value for the
-object to take on, or else this method will croak.
-
-=item is_any
-
- $bool = $obj->is_any (value, another_value, $object, ...);
-
-Returns true if an enumeration object's current value matches any of a
-given list of possible values.
-
-Croaks if any of the values in the list are not legal values for the
-object to have.
-
-=item is_none
-
- $bool = $obj->is_none (value, another_value, $object, ...);
-
-Returns true if an enumeration object's current value does NOT match
-ANY of a given list of possible values.
-
-Croaks if any of the values in the list are not legal values for the
-object to have.
-
-=item eq
-
- $boolean = $obj eq some_value;
- $boolean = $obj1 eq $obj2;
-
-Compares the object for equality to a value or another object.  The
-same thing as the L</is> method, but easier to use.
-
-=item ne
-
- $boolean = $obj ne some_value;
- $boolean = $obj1 ne $obj2;
-
-Compares the object for inequality to a value or another object.
-
-=back
-
-=head1 EXAMPLE
-
- # File: Color.pm
- #
- package Color;
- use base 'enum';
- __PACKAGE__->set_enumerations(qw(red yellow blue brown black green white));
-
- # File: some_program.pl
- #
- use strict;
- use warnings;
- use Color ':all';
- #
- #
- my $color = new Color(red);
- print "Color is currently $color\n";
- #
- $color->set(white);
- print "Color is now $color\n";
- #
- print "I TOLD you it's white!\n" if $color eq white;
- #
- $color->set('purple');   # dies.
-
-
-=head1 EXPORTS
-
-None.  But if you subclass this module, then people who use your
-module will have the option to have symbols imported into their
-namespace.
-
-=head1 AUTHOR/COPYRIGHT
-
-Copyright (c) 2008 by Eric J. Roode, ROODE I<-at-> cpan I<-dot-> org
-
-All rights reserved.
-
-This module is copyrighted only to ensure proper attribution of
-authorship and to ensure that it remains available to all.  This
-module is free, open-source software.  This module may be freely used
-for any purpose, commercial, public, or private, provided that proper
-credit is given, and that no more-restrictive license is applied to
-derivative (not dependent) works.
-
-Substantial efforts have been made to ensure that this software meets
-high quality standards; however, no guarantee can be made that there
-are no undiscovered bugs, and no warranty is made as to suitability to
-any given use, including merchantability.  Should this module cause
-your house to burn down, your dog to collapse, your heart-lung machine
-to fail, your spouse to desert you, or George Bush to be re-elected, I
-can offer only my sincere sympathy and apologies, and promise to
-endeavor to improve the software.
+L<constant>
 
 =cut
+

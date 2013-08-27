@@ -1,19 +1,23 @@
 ---
-name: enum
-version: 0.01
+abstract: unknown
 author:
-  - 'Eric J. Roode <roode@cpan.org>'
-abstract: Yet Another enumeration class implementation.
-license: perl
-resources:
-  license: http://dev.perl.org/licenses/
+  - unknown
 build_requires:
-  Test::More: 0
-provides:
-  enum:
-    file: lib/enum.pm
-    version: 0.01
-generated_by: Module::Build version 0.2808
+  ExtUtils::MakeMaker: 0
+dynamic_config: 1
+generated_by: 'ExtUtils::MakeMaker version 6.72, CPAN::Meta::Converter version 2.132140'
+license: perl
 meta-spec:
-  url: http://module-build.sourceforge.net/META-spec-v1.2.html
-  version: 1.2
+  url: http://module-build.sourceforge.net/META-spec-v1.4.html
+  version: 1.4
+name: enum
+no_index:
+  directory:
+    - t
+    - inc
+requires:
+  Carp: 0
+  strict: 0
+resources:
+  repository: git://github.com/neilbowers/enum.git
+version: 1.016_01
