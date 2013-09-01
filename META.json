@@ -32,7 +32,7 @@
          }
       }
    },
-   "release_status" : "testing",
+   "release_status" : "stable",
    "resources" : {
       "repository" : {
          "type" : "git",
@@ -40,5 +40,5 @@
          "web" : "https://github.com/neilbowers/enum"
       }
    },
-   "version" : "1.016_01"
+   "version" : "1.02"
 }
