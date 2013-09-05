@@ -20,4 +20,4 @@ requires:
   strict: 0
 resources:
   repository: git://github.com/neilbowers/enum.git
-version: 1.04
+version: 1.05
