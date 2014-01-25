@@ -4,7 +4,7 @@
       "unknown"
    ],
    "dynamic_config" : 1,
-   "generated_by" : "ExtUtils::MakeMaker version 6.72, CPAN::Meta::Converter version 2.132140",
+   "generated_by" : "ExtUtils::MakeMaker version 6.82, CPAN::Meta::Converter version 2.133380",
    "license" : [
       "perl_5"
    ],
@@ -28,7 +28,9 @@
       "runtime" : {
          "requires" : {
             "Carp" : "0",
-            "strict" : "0"
+            "perl" : "5.006",
+            "strict" : "0",
+            "warnings" : "0"
          }
       }
    },
@@ -40,5 +42,5 @@
          "web" : "https://github.com/neilbowers/enum"
       }
    },
-   "version" : "1.05"
+   "version" : "1.06"
 }

@@ -13,8 +13,9 @@ WriteMakefile(
     'VERSION_FROM' => 'lib/enum.pm', # finds $VERSION
 
     PREREQ_PM => {
-        'Carp' => 0,
-        'strict' => 0,
+        'Carp'     => 0,
+        'strict'   => 0,
+        'warnings' => 0,
     },
 
     ($mm_ver >= 6.31 ? (LICENSE => 'perl') : ()),
@@ -29,6 +30,11 @@ WriteMakefile(
                 url  => 'git://github.com/neilbowers/enum.git',
             },
         },
-    }))
+    })),
+
+    ($mm_ver >= 6.48
+        ? (MIN_PERL_VERSION => 5.006)
+        : ()
+    ),
 
 );
