@@ -4,7 +4,7 @@ use warnings;
 no strict 'refs';  # Let's just make this very clear right off
 
 use Carp;
-our $VERSION = '1.08';
+our $VERSION = '1.09';
 
 my $Ident = '[^\W_0-9]\w*';
 
@@ -206,13 +206,15 @@ enum - C style enumerated types and bitmask flags in Perl
 
 =head1 DESCRIPTION
 
-Defines a set of symbolic constants with ordered numeric values ala B<C> B<enum> types.
+The B<enum> module is used to define a set of symbolic constants
+that will typically have ordered numeric values;
+they are similar to the I<enum> type in the C programming language.
+The module can also be used to define bitmask constants,
+which are described in L</"BITMASKS"> below.
 
-Now capable of creating creating ordered bitmask constants as well.  See the B<BITMASKS>
-section for details.
-
-What are they good for?  Typical uses would be for giving mnemonic names to indexes of
-arrays.  Such arrays might be a list of months, days, or a return value index from
+What are enumerations good for?
+Typical uses would be for giving mnemonic names to indexes of arrays.
+Such arrays might be a list of months, days, or a return value index from
 a function such as localtime():
 
   use enum qw(
@@ -232,7 +234,7 @@ This not only reads easier, but can also be typo-checked at compile time when
 run under B<use strict>.  That is, if you misspell B<Days_Fri> as B<Days_Fry>,
 you'll generate a compile error.
 
-=head1 BITMASKS, bitwise operations, and bitmask option values
+=head1 BITMASKS
 
 The B<BITMASK> option allows the easy creation of bitmask constants such as
 functions like flock() and sysopen() use.  These are also very useful for your
@@ -297,7 +299,12 @@ ever use this feature...?
 =head1 SEE ALSO
 
 There are a number of modules that can be used to define enumerations:
-L<Class::Enum>, L<enum::fields>, L<enum::hash>, L<Readonly::Enum>, L<Object::Enum>.
+L<Class::Enum>, L<enum::fields>, L<enum::hash>, L<Readonly::Enum>,
+L<Object::Enum>, L<Enumeration>.
+
+If you're using L<Moose>, then L<MooseX::Enumeration> may be of interest.
+L<Type::Tiny::Enum> is part of the
+L<Type-Tiny|https://metacpan.org/release/Type-Tiny> distribution.
 
 There are many CPAN modules related to defining constants in Perl;
 here are some of the best ones:
@@ -306,6 +313,10 @@ L<constant>, L<Const::Fast>, L<constant::lexical>, L<constant::our>.
 Neil Bowers has written a
 L<review of CPAN modules for definining constants|http://neilb.org/reviews/constants.html>,
 which covers all such modules.
+
+=head1 REPOSITORY
+
+L<https://github.com/neilbowers/enum>
 
 =head1 AUTHOR
 
