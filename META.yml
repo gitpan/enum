@@ -24,4 +24,4 @@ requires:
   warnings: '0'
 resources:
   repository: git://github.com/neilbowers/enum.git
-version: '1.09'
+version: '1.10'
